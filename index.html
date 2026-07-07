@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Trading Republic · Paper Trader</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<style>
+  :root{
+    --paper:#faf9f6; --card:#ffffff; --ink:#1a1a1a; --muted:#8a8578; --line:#e4e0d6;
+    --blue:#2f6fdb; --red:#b0472f; --green:#2e7d4f; --amber:#a06a00;
+  }
+  *{box-sizing:border-box; margin:0; padding:0;}
+  body{background:var(--paper); color:var(--ink); font-family:"SF Mono",ui-monospace,Menlo,Consolas,monospace; font-size:13px; padding:18px; max-width:1180px; margin:0 auto;}
+  .serif{font-family:Georgia,"Times New Roman",serif;}
+  .card{background:var(--card); border:1px solid var(--line); border-radius:10px; padding:18px 20px; margin-bottom:14px;}
+  .topbar{display:flex; align-items:center; gap:12px; flex-wrap:wrap;}
+  .dot{width:34px;height:34px;border-radius:50%;border:1.5px solid var(--ink);display:flex;align-items:center;justify-content:center;font-size:15px;}
+  .kicker{font-size:10px; letter-spacing:.18em; color:var(--muted); text-transform:uppercase;}
+  h1{font-size:19px; letter-spacing:.02em;}
+  .chip{border:1px solid var(--line); border-radius:6px; padding:4px 10px; font-size:10.5px; letter-spacing:.08em; color:var(--muted); text-transform:uppercase;}
+  .chip.live{color:var(--blue); border-color:#c8d8f4; background:#f0f5fd;}
+  .spacer{flex:1;}
+  .hero-val{font-size:54px; line-height:1.05; font-weight:400;}
+  .row{display:flex; gap:14px; flex-wrap:wrap;}
+  .col{flex:1; min-width:260px;}
+  .stat{border-left:2px solid var(--line); padding-left:12px; min-width:110px;}
+  .stat b{display:block; font-size:17px; font-weight:600;}
+  .stat span{font-size:10px; color:var(--muted); text-transform:uppercase; letter-spacing:.1em;}
+  .pos{color:var(--green);} .neg{color:var(--red);} .blue{color:var(--blue);}
+  table{width:100%; border-collapse:collapse; font-size:12.5px;}
+  th{font-size:10px; text-transform:uppercase; letter-spacing:.12em; color:var(--muted); text-align:left; padding:6px 8px; border-bottom:1px solid var(--line);}
+  td{padding:8px; border-bottom:1px solid #f0ede4;}
+  .feed{max-height:340px; overflow-y:auto; font-size:12px; line-height:1.55; white-space:pre-wrap; color:#3a382f;}
+  .sec-title{display:flex; align-items:baseline; gap:10px; margin-bottom:12px;}
+  .sec-title h2{font-size:13px; letter-spacing:.04em;}
+  .bar-wrap{background:#f1eee5; border-radius:5px; height:10px; overflow:hidden; margin-top:6px;}
+  .bar{height:100%; background:var(--green); border-radius:5px;}
+  #overlay{position:fixed; inset:0; background:rgba(250,249,246,.97); display:flex; align-items:center; justify-content:center; z-index:50; padding:20px;}
+  #overlay .card{max-width:520px;}
+  input[type=password]{width:100%; padding:10px; border:1px solid var(--line); border-radius:6px; font-family:inherit; font-size:13px; margin:10px 0;}
+  button{background:var(--ink); color:#fff; border:0; border-radius:6px; padding:10px 18px; font-family:inherit; font-size:12px; letter-spacing:.05em; cursor:pointer;}
+  button.ghost{background:transparent; color:var(--muted); text-decoration:underline;}
+  .err{color:var(--red); font-size:12px; margin-top:8px;}
+  .footer{color:var(--muted); font-size:10.5px; letter-spacing:.08em; text-transform:uppercase; text-align:center; padding:10px 0 30px;}
+  ol{padding-left:18px; font-size:12px; line-height:1.7; color:#3a382f;}
+  a{color:var(--blue);}
+  @media(max-width:640px){ .hero-val{font-size:38px;} body{padding:10px;} }
+</style>
+</head>
+<body>
+
+<div id="overlay">
+  <div class="card">
+    <div class="kicker">One-time setup</div>
+    <h1 class="serif" style="margin:6px 0 10px">Connect to your repo</h1>
+    <ol>
+      <li>Open <a href="https://github.com/settings/personal-access-tokens/new" target="_blank">github.com → fine-grained tokens</a></li>
+      <li>Name: <b>dashboard-readonly</b> · Expiration: 90 days</li>
+      <li>Repository access: <b>Only select repositories → paper-trader</b></li>
+      <li>Permissions → Repository → <b>Contents: Read-only</b></li>
+      <li>Generate, copy, paste below. It stays in this browser only.</li>
+    </ol>
+    <input type="password" id="tok" placeholder="github_pat_...">
+    <button onclick="saveTok()">Connect</button>
+    <div class="err" id="tokerr"></div>
+  </div>
+</div>
+
+<div class="card topbar">
+  <div class="dot serif">T</div>
+  <div>
+    <div class="kicker">Trading Republic · Congressional + Smart-Money Copy Strategy</div>
+    <h1 class="serif">PAPER TRADER · CLOUD DESK</h1>
+  </div>
+  <span class="chip live">● Live · Simulated</span>
+  <div class="spacer"></div>
+  <span class="chip" id="daycount">Day — / 90</span>
+  <span class="chip" id="clock">--:--:-- UTC</span>
+  <button class="ghost" onclick="resetTok()" style="font-size:10px">token</button>
+</div>
+
+<div class="card">
+  <div class="kicker">Total portfolio value · vs $100,000 start · fake money, real prices</div>
+  <div class="hero-val serif" id="heroval">$—</div>
+  <div class="row" style="margin-top:14px">
+    <div class="stat"><b id="pnl">—</b><span>P&L since start</span></div>
+    <div class="stat"><b id="vsspy">—</b><span>vs SPY benchmark</span></div>
+    <div class="stat"><b id="cash">—</b><span>Cash reserve</span></div>
+    <div class="stat"><b id="poscount">—</b><span>Positions</span></div>
+    <div class="stat"><b id="drawdown">—</b><span>Drawdown from peak</span></div>
+  </div>
+</div>
+
+<div class="row">
+  <div class="col card" style="min-width:320px">
+    <div class="sec-title"><h2>◆ Equity Curve — Portfolio vs SPY</h2><span class="kicker" id="curvenote"></span></div>
+    <canvas id="curve" height="210"></canvas>
+  </div>
+  <div class="col card" style="max-width:340px">
+    <div class="sec-title"><h2>◆ Charter</h2></div>
+    <div class="stat" style="border:none;padding:0"><b id="judgment">—</b><span>days to judgment day (Oct 6)</span></div>
+    <div style="margin-top:14px" class="kicker">Pain limit: −15% from peak</div>
+    <div class="bar-wrap"><div class="bar" id="painbar" style="width:0%"></div></div>
+    <div class="kicker" id="painlabel" style="margin-top:6px"></div>
+    <div style="margin-top:16px" class="kicker" id="pausestate"></div>
+    <div style="margin-top:16px; font-size:11px; color:var(--muted); line-height:1.6">
+      Pass = beat SPY by any margin with drawdown never past −15%.
+      Pass → 90 more paper days. Two passing quarters before any real-money talk.
+    </div>
+  </div>
+</div>
+
+<div class="card">
+  <div class="sec-title"><h2>◆ Holdings</h2><span class="kicker" id="holdnote"></span></div>
+  <div style="overflow-x:auto">
+  <table id="holdings">
+    <thead><tr><th>Ticker</th><th>Sleeve</th><th>Signal source</th><th>Shares</th><th>Avg price</th><th>Cost</th><th>Quality</th><th>Exit trigger</th></tr></thead>
+    <tbody></tbody>
+  </table>
+  </div>
+</div>
+
+<div class="row">
+  <div class="col card">
+    <div class="sec-title"><h2>◆ Trade Log</h2><span class="kicker">every action + reasoning</span></div>
+    <div class="feed" id="tradelog">loading…</div>
+  </div>
+  <div class="col card">
+    <div class="sec-title"><h2>◆ Latest Report</h2><span class="kicker" id="repdate"></span></div>
+    <div class="feed" id="report">loading…</div>
+  </div>
+</div>
+
+<div class="footer">Simulated portfolio — no real money · data pulled live from github.com/kuwaiti99/paper-trader · refresh page to update</div>
+
+<script>
+const REPO = 'kuwaiti99/paper-trader';
+const API = 'https://api.github.com/repos/' + REPO + '/contents/';
+
+function tok(){ return localStorage.getItem('gh_pat') || ''; }
+function saveTok(){
+  const t = document.getElementById('tok').value.trim();
+  if(!t){ document.getElementById('tokerr').textContent = 'Paste the token first.'; return; }
+  localStorage.setItem('gh_pat', t); location.reload();
+}
+function resetTok(){ localStorage.removeItem('gh_pat'); location.reload(); }
+
+async function gh(path, raw=true){
+  const r = await fetch(API + path + '?ref=main', { headers: {
+    'Authorization': 'Bearer ' + tok(),
+    'Accept': raw ? 'application/vnd.github.raw+json' : 'application/vnd.github+json'
+  }});
+  if(!r.ok) throw new Error(path + ' → HTTP ' + r.status);
+  return raw ? r.text() : r.json();
+}
+
+function money(n){ return '$' + Number(n).toLocaleString('en-US', {maximumFractionDigits:0}); }
+function pct(n){ return (n>=0?'+':'') + n.toFixed(2) + '%'; }
+
+setInterval(()=>{ document.getElementById('clock').textContent = new Date().toISOString().slice(11,19) + ' UTC'; }, 1000);
+
+async function load(){
+  if(!tok()) return; // overlay stays
+  document.getElementById('overlay').style.display = 'none';
+  try{
+    const [pfRaw, histRaw, logRaw, repList] = await Promise.all([
+      gh('state/portfolio.json'),
+      gh('state/equity-history.json').catch(()=> '[]'),
+      gh('state/trade-log.md'),
+      gh('reports', false).catch(()=> [])
+    ]);
+    const pf = JSON.parse(pfRaw);
+    const hist = JSON.parse(histRaw);
+
+    // Values
+    const last = hist.length ? hist[hist.length-1] : null;
+    const pv = last ? last.portfolio_value : (pf.cash + (pf.positions||[]).reduce((s,p)=>s+(p.cost_basis||0),0));
+    const spyv = last ? last.spy_value : (pf.benchmark_spy ? pf.benchmark_spy.current_value : 100000);
+    document.getElementById('heroval').textContent = money(pv);
+    const pnl = (pv-100000)/1000;
+    const pnlEl = document.getElementById('pnl');
+    pnlEl.textContent = pct((pv-100000)/100000*100) + ' (' + (pv>=100000?'+':'−') + money(Math.abs(pv-100000)).slice(1) + ')';
+    pnlEl.className = pv>=100000 ? 'pos':'neg';
+    const rel = (pv - spyv)/1000;
+    const vs = document.getElementById('vsspy');
+    vs.textContent = (rel>=0?'+':'−') + '$' + Math.abs(pv-spyv).toLocaleString('en-US',{maximumFractionDigits:0});
+    vs.className = rel>=0 ? 'pos':'neg';
+    document.getElementById('cash').textContent = money(pf.cash) + ' (' + (pf.cash/pv*100).toFixed(0) + '%)';
+    document.getElementById('poscount').textContent = (pf.positions||[]).length + ' / 40';
+    const peak = pf.peak_value || 100000;
+    const dd = (pv-peak)/peak*100;
+    const ddEl = document.getElementById('drawdown');
+    ddEl.textContent = pct(dd); ddEl.className = dd < -7 ? 'neg' : '';
+
+    // Charter
+    const days = Math.max(0, Math.ceil((new Date('2026-10-06') - new Date())/86400000));
+    document.getElementById('judgment').textContent = days;
+    document.getElementById('daycount').textContent = 'Day ' + Math.min(90, 90-days+1) + ' / 90';
+    const used = Math.min(100, Math.abs(Math.min(0,dd))/15*100);
+    const bar = document.getElementById('painbar');
+    bar.style.width = Math.max(2,used) + '%';
+    bar.style.background = used>66 ? 'var(--red)' : used>33 ? 'var(--amber)' : 'var(--green)';
+    document.getElementById('painlabel').textContent = Math.abs(Math.min(0,dd)).toFixed(1) + '% of 15% used';
+    document.getElementById('pausestate').textContent = pf.paused_by_charter ? '⛔ PAUSED BY CHARTER' : '● trading normally';
+
+    // Holdings
+    const tb = document.querySelector('#holdings tbody');
+    tb.innerHTML = '';
+    (pf.positions||[]).forEach(p=>{
+      const tr = document.createElement('tr');
+      tr.innerHTML = '<td><b>'+ (p.ticker||'?') +'</b></td><td>'+ (p.sleeve||'—') +'</td><td>'+ (p.signal_source||p.source||'—') +
+        '</td><td>'+ (p.shares!=null?p.shares:'—') +'</td><td>'+ (p.avg_price!=null?('$'+p.avg_price):'—') +
+        '</td><td>'+ (p.cost_basis!=null?money(p.cost_basis):'—') +'</td><td>'+ (p.quality_score!=null?p.quality_score:'exempt') +
+        '</td><td style="font-size:11px;color:var(--muted)">'+ (p.exit_trigger||'—') +'</td>';
+      tb.appendChild(tr);
+    });
+    document.getElementById('holdnote').textContent = (pf.positions||[]).length ? '' : 'no positions yet';
+
+    // Curve
+    const labels = hist.map(h=>h.date);
+    new Chart(document.getElementById('curve'), {
+      type:'line',
+      data:{ labels,
+        datasets:[
+          {label:'Portfolio', data:hist.map(h=>h.portfolio_value), borderColor:'#2f6fdb', backgroundColor:'rgba(47,111,219,.08)', fill:true, tension:.25, pointRadius:2},
+          {label:'SPY $100k', data:hist.map(h=>h.spy_value), borderColor:'#b0472f', borderDash:[5,4], fill:false, tension:.25, pointRadius:0}
+        ]},
+      options:{ plugins:{legend:{labels:{font:{family:'monospace', size:10}}}},
+        scales:{ x:{ticks:{font:{family:'monospace',size:9}}}, y:{ticks:{font:{family:'monospace',size:9}, callback:v=>'$'+(v/1000)+'k'}}} }
+    });
+    document.getElementById('curvenote').textContent = hist.length<3 ? 'builds as runs accumulate' : hist.length + ' sessions';
+
+    // Trade log (newest first)
+    const lines = logRaw.split('\n').filter(l=>l.trim());
+    document.getElementById('tradelog').textContent = lines.slice(-80).reverse().join('\n\n');
+
+    // Latest report
+    if(Array.isArray(repList) && repList.length){
+      const latest = repList.map(f=>f.name).sort().reverse()[0];
+      document.getElementById('repdate').textContent = latest.replace('.md','');
+      document.getElementById('report').textContent = await gh('reports/' + latest);
+    } else { document.getElementById('report').textContent = 'No reports yet.'; }
+
+  }catch(e){
+    document.getElementById('overlay').style.display = 'flex';
+    document.getElementById('tokerr').textContent = 'Connection failed: ' + e.message + ' — check the token has Contents:Read on paper-trader.';
+  }
+}
+load();
+</script>
+</body>
+</html>
