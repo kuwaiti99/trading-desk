@@ -92,20 +92,12 @@
 </head>
 <body>
 
-<div id="overlay">
+<div id="overlay" style="display:none">
   <div class="card">
-    <div class="kicker">One-time setup</div>
-    <h1 style="margin:8px 0 12px; font-size:20px">Connect your desk</h1>
-    <ol>
-      <li>Open <a href="https://github.com/settings/personal-access-tokens/new" target="_blank">GitHub → fine-grained tokens</a></li>
-      <li>Name <b>dashboard</b>, expiry 90 days</li>
-      <li>Repository access → <b>Only paper-trader</b></li>
-      <li>Permissions → <b>Contents: Read-only</b></li>
-      <li>Generate, copy, paste below — stays on this device only</li>
-    </ol>
-    <input type="password" id="tok" placeholder="github_pat_..." autocapitalize="off" autocorrect="off" spellcheck="false">
-    <button onclick="saveTok()">Connect →</button>
+    <div class="kicker">Status</div>
+    <h1 style="margin:8px 0 12px; font-size:20px">Loading desk…</h1>
     <div class="err" id="tokerr"></div>
+    <button onclick="location.reload()" style="margin-top:14px">Retry</button>
   </div>
 </div>
 
@@ -117,7 +109,6 @@
   </div>
   <div class="spacer"></div>
   <span class="pill live"><span class="live-dot"></span>Simulated</span>
-  <button class="ghost" onclick="resetTok()">reset</button>
 </div>
 
 <div class="card">
@@ -190,23 +181,22 @@
 
 <script>
 const REPO='kuwaiti99/paper-trader';
+const RAW='https://raw.githubusercontent.com/'+REPO+'/main/';
 const API='https://api.github.com/repos/'+REPO+'/contents/';
-function tok(){return localStorage.getItem('gh_pat')||'';}
-function saveTok(){const t=document.getElementById('tok').value.trim();
-  if(!t){document.getElementById('tokerr').textContent='Paste the token first.';return;}
-  localStorage.setItem('gh_pat',t);location.reload();}
-function resetTok(){localStorage.removeItem('gh_pat');location.reload();}
 async function gh(path,raw=true){
-  const r=await fetch(API+path+'?ref=main',{headers:{'Authorization':'Bearer '+tok(),
-    'Accept':raw?'application/vnd.github.raw+json':'application/vnd.github+json'}});
+  if(raw){
+    const r=await fetch(RAW+path+'?t='+Date.now());
+    if(!r.ok)throw new Error(path+' → HTTP '+r.status);
+    return r.text();
+  }
+  const r=await fetch(API+path+'?ref=main&t='+Date.now());
   if(!r.ok)throw new Error(path+' → HTTP '+r.status);
-  return raw?r.text():r.json();
+  return r.json();
 }
 function money(n){return '$'+Number(n).toLocaleString('en-US',{maximumFractionDigits:0});}
 function pct(n){return (n>=0?'+':'')+n.toFixed(2)+'%';}
 
 async function load(){
-  if(!tok())return;
   document.getElementById('overlay').style.display='none';
   try{
     const [pfRaw,histRaw,logRaw,repList]=await Promise.all([
@@ -295,10 +285,11 @@ async function load(){
     }else{document.getElementById('report').textContent='No reports yet.';}
   }catch(e){
     document.getElementById('overlay').style.display='flex';
-    document.getElementById('tokerr').textContent='Connection failed: '+e.message+' — check the token has Contents:Read on paper-trader.';
+    document.getElementById('tokerr').textContent='Could not load data: '+e.message+'. If the paper-trader repo is still private, make it public (Settings → General → Danger Zone) — the dashboard reads public files, no login needed.';
   }
 }
 load();
+setInterval(load, 300000);
 </script>
 </body>
 </html>
